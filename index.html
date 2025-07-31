@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>技术知识模拟EXAM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 文件解析库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div id="app" class="flex flex-col md:flex-row h-screen relative">
+        <!-- 侧边栏折叠按钮 - 仅在移动设备上显示 -->
+        <button id="toggleSidebarBtn" class="md:hidden fixed top-4 right-4 z-50 bg-blue-500 text-white p-2 rounded-full shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16" id="menuIcon">
+                <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16" id="closeIcon" class="hidden">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+            </svg>
+        </button>
+        
+        <!-- 侧边栏 -->
+        <aside id="sidebar" class="w-full md:w-80 bg-white shadow-md p-4 flex flex-col fixed md:static h-screen z-40 transition-transform duration-300 transform -translate-x-full md:translate-x-0">
+            <div class="mb-4">
+                <h1 class="text-xl font-bold">模拟EXAM工具</h1>
+                <p class="text-xs text-gray-500 mt-1">版本 v1.2.0</p>
+            </div>
+            
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-medium text-gray-700">API Key 配置</label>
+                    <span id="apiKeyStatus" class="text-xs text-gray-500">未设置</span>
+                </div>
+                <button id="apiKeyBtn" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v-2H7v-2H4a1 1 0 01-1-1v-4a1 1 0 011-1h3L6 9a6 6 0 017.745-5.743A5.978 5.978 0 0119 9z"></path>
+                    </svg>
+                    <span id="apiKeyBtnText">设置 API Key</span>
+                </button>
+                <p class="text-xs text-gray-500 mt-1">点击按钮配置您的 DeepSeek API Key</p>
+            </div>
+
+            <button id="newExamBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded mb-4">
+                + 新建考试
+            </button>
+            
+            <h2 class="text-lg font-semibold mb-2 border-t pt-2">考试记录</h2>
+            <div id="historyList" class="flex-grow overflow-y-auto">
+                <!-- 历史记录将通过 JS 动态添加 -->
+            </div>
+            
+            <button id="clearHistoryBtn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded mt-4">
+                清空所有记录
+            </button>
+            
+            <!-- 数据恢复按钮 -->
+            <button id="recoverDataBtn" class="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm py-2 px-4 rounded mt-2 flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                数据恢复
+            </button>
+        </aside>
+
+        <!-- 遮罩层 - 移动端点击侧边栏外关闭侧边栏 -->
+        <div id="sidebarOverlay" class="fixed inset-0 bg-black opacity-50 z-30 hidden md:hidden"></div>
+
+        <!-- API Key 设置弹窗 -->
+        <div id="apiKeyModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+                <!-- 弹窗头部 -->
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v-2H7v-2H4a1 1 0 01-1-1v-4a1 1 0 011-1h3L6 9a6 6 0 017.745-5.743A5.978 5.978 0 0119 9z"></path>
+                            </svg>
+                            <h3 class="text-lg font-semibold">API Key 配置</h3>
+                        </div>
+                        <button id="closeApiKeyModal" class="text-white hover:text-gray-200 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 弹窗内容 -->
+                <div class="p-6">
+                    <div class="mb-4">
+                        <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-2">DeepSeek API Key</label>
+                        <div class="relative">
+                            <input type="password" id="apiKeyInput" placeholder="请输入您的 DeepSeek API Key" 
+                                   class="w-full p-3 pr-10 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm">
+                            <button id="toggleApiKeyVisibility" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                <svg class="w-5 h-5" id="eyeIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                <svg class="w-5 h-5 hidden" id="eyeOffIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="text-sm text-blue-700">
+                                <p class="font-medium mb-1">使用说明：</p>
+                                <ul class="text-xs space-y-1">
+                                    <li>• API Key 将安全保存在您的浏览器本地存储中</li>
+                                    <li>• 访问 <a href="https://platform.deepseek.com" target="_blank" class="underline hover:text-blue-800">DeepSeek 控制台</a> 获取 API Key</li>
+                                    <li>• 确保您的 API Key 有足够的配额</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button id="cancelApiKey" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-lg transition-colors">
+                            取消
+                        </button>
+                        <button id="saveApiKey" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all">
+                            保存配置
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 p-4 md:p-6 overflow-y-auto md:ml-0 pt-16 md:pt-6">
+            <!-- 考试设置视图 -->
+            <div id="setup-view">
+                <div class="max-w-4xl mx-auto">
+                    <!-- 页面标题 -->
+                    <div class="text-center mb-8">
+                        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">创建新的模拟考试</h2>
+                        <p class="text-gray-600">选择题目范畴，配置考试参数，开始您的技术知识测试之旅</p>
+                    </div>
+
+                    <!-- 配置步骤指示器 -->
+                    <div class="flex justify-center mb-8">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center">
+                                <div class="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full text-sm font-medium">1</div>
+                                <span class="ml-2 text-sm font-medium text-gray-700">选择题目范畴</span>
+                            </div>
+                            <div class="w-8 h-px bg-gray-300"></div>
+                            <div class="flex items-center">
+                                <div class="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-500 rounded-full text-sm font-medium">2</div>
+                                <span class="ml-2 text-sm font-medium text-gray-500">配置考试参数</span>
+                            </div>
+                            <div class="w-8 h-px bg-gray-300"></div>
+                            <div class="flex items-center">
+                                <div class="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-500 rounded-full text-sm font-medium">3</div>
+                                <span class="ml-2 text-sm font-medium text-gray-500">生成试卷</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主要配置区域 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- 左侧：题目来源选择 -->
+                        <div class="lg:col-span-2">
+                            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-2 h-8 bg-blue-500 rounded-full mr-3"></div>
+                                    <h3 class="text-xl font-semibold text-gray-800">选择题库来源</h3>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                    <label class="relative">
+                                        <input type="radio" id="sourceModel" name="questionSource" value="model" checked class="peer sr-only">
+                                        <div class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300">
+                                            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mb-3">
+                                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                                </svg>
+                                            </div>
+                                            <span class="font-medium text-gray-700">AI智能生成</span>
+                                            <span class="text-sm text-gray-500 text-center mt-1">基于知识点智能生成题目</span>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="relative">
+                                        <input type="radio" id="sourceCustom" name="questionSource" value="custom" class="peer sr-only">
+                                        <div class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300">
+                                            <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mb-3">
+                                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                            </div>
+                                                                        <span class="font-medium text-gray-700">上传题库文件</span>
+                            <span class="text-sm text-gray-500 text-center mt-1">支持TXT、DOCX格式</span>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="relative">
+                                        <input type="radio" id="sourcePaste" name="questionSource" value="paste" class="peer sr-only">
+                                        <div class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300">
+                                            <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mb-3">
+                                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                            </div>
+                                            <span class="font-medium text-gray-700">粘贴题库内容</span>
+                                            <span class="text-sm text-gray-500 text-center mt-1">直接粘贴文本内容</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <!-- 题库来源相关的配置区域 -->
+                                <div id="customDatabaseContainer" class="hidden">
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <div class="flex flex-col sm:flex-row gap-3">
+                                            <input type="file" id="customDatabaseFile" accept=".txt,.docx" class="hidden">
+                                            <div class="flex-grow p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-sm overflow-hidden whitespace-nowrap overflow-ellipsis bg-white" id="fileNameDisplay">未选择文件</div>
+                                            <button id="selectFileBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center">
+                                                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                选择文件
+                                            </button>
+                                        </div>
+                                                                <p class="text-xs text-gray-500 mt-2">支持上传 TXT、DOCX 格式的文件，将从文件内容中提取知识点用于生成题目。</p>
+                        <div class="supported-formats mt-2">
+                            <span class="format-badge">TXT</span>
+                            <span class="format-badge">DOCX</span>
+                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="pasteContentContainer" class="hidden">
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <textarea id="pasteContentArea" 
+                                            placeholder="请在此处粘贴您的题库内容，支持各种格式的技术知识点...&#10;&#10;例如：&#10;- Java基础知识点&#10;- Spring框架原理&#10;- 数据库优化技巧&#10;- 等等..." 
+                                            class="w-full p-4 border-2 border-gray-200 rounded-lg resize-vertical text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                            rows="8"></textarea>
+                                        <p class="text-xs text-gray-500 mt-2">请粘贴包含技术知识点的内容，系统将基于此内容生成相关题目。</p>
+                                    </div>
+                                </div>
+
+                                <!-- 预览区域 -->
+                                <div id="previewContainer" class="mt-4 hidden">
+                                    <div class="border-2 border-blue-200 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
+                                        <div class="flex justify-between items-center mb-4">
+                                            <div class="flex items-center">
+                                                <div class="w-2 h-6 bg-blue-500 rounded-full mr-3"></div>
+                                                <h4 class="font-semibold text-blue-800">题库内容预览</h4>
+                                            </div>
+                                            <div class="flex space-x-2">
+                                                <button id="editPreviewBtn" class="text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded-md hover:bg-blue-100 transition-colors">编辑</button>
+                                                <button id="reUploadBtn" class="text-orange-600 hover:text-orange-800 font-medium px-3 py-1 rounded-md hover:bg-orange-100 transition-colors">重新上传</button>
+                                            </div>
+                                        </div>
+                                        <div id="previewContent" class="bg-white border border-gray-200 rounded-lg p-4 max-h-60 overflow-y-auto text-sm text-gray-700 whitespace-pre-wrap shadow-inner"></div>
+                                        <div id="editPreviewArea" class="hidden">
+                                            <textarea id="editContentArea" class="w-full p-4 border border-gray-200 rounded-lg resize-vertical text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" rows="10"></textarea>
+                                            <div class="mt-3 flex space-x-3">
+                                                <button id="saveEditBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-colors">保存修改</button>
+                                                <button id="cancelEditBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-md transition-colors">取消</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 知识点选择区域 -->
+                            <div class="bg-white rounded-xl shadow-lg p-6">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-2 h-8 bg-green-500 rounded-full mr-3"></div>
+                                    <h3 class="text-xl font-semibold text-gray-800">选择知识点范畴</h3>
+                                    <span class="ml-2 text-sm text-gray-500">(可多选)</span>
+                                </div>
+                                
+                                <div id="topicsTree" class="p-4 border-2 border-gray-100 rounded-lg max-h-60 overflow-y-auto bg-gray-50">
+                                    <!-- 知识点树将通过 JS 动态生成 -->
+                                </div>
+                                
+                                <div class="mt-6">
+                                    <label class="block text-gray-700 font-medium mb-3">自定义知识点:</label>
+                                    <div class="flex flex-col sm:flex-row gap-3">
+                                        <input type="text" id="customTopic" placeholder="请输入自定义知识点，多个知识点用逗号分隔" class="flex-grow p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                                        <button id="addCustomTopicBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center">
+                                            <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                添加
+                            </button>
+                        </div>
+                                    <div id="customTopicsList" class="mt-3 flex flex-wrap gap-2">
+                            <!-- 自定义知识点标签将通过 JS 动态添加 -->
+                        </div>
+                    </div>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：考试配置 -->
+                        <div class="lg:col-span-1">
+                            <div class="bg-white rounded-xl shadow-lg p-6 sticky top-6">
+                                <div class="flex items-center mb-6">
+                                    <div class="w-2 h-8 bg-purple-500 rounded-full mr-3"></div>
+                                    <h3 class="text-xl font-semibold text-gray-800">考试配置</h3>
+                                </div>
+                                
+                                <div class="space-y-6">
+                                    <div>
+                                        <label for="numQuestions" class="block text-gray-700 font-medium mb-3">题目数量</label>
+                                        <div class="relative">
+                                            <input type="range" id="numQuestions" min="10" max="60" value="15" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+                                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                                <span>10</span>
+                                                <span>30</span>
+                                                <span>60</span>
+                                            </div>
+                                        </div>
+                                        <div class="text-center mt-3">
+                                            <span class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full text-xl font-bold">
+                                                <span id="numQuestionsLabel">15</span>
+                                            </span>
+                                            <p class="text-sm text-gray-500 mt-1">道题目</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="examDifficulty" class="block text-gray-700 font-medium mb-3">考试难度</label>
+                                        <div class="relative">
+                                            <input type="range" id="examDifficulty" min="1" max="10" value="5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer difficulty-slider">
+                                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                                <span>1级</span>
+                                                <span>5级</span>
+                                                <span>10级</span>
+                                            </div>
+                                        </div>
+                                        <div class="text-center mt-3">
+                                            <span class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-full text-lg font-bold">
+                                                <span id="difficultyLabel">5</span>
+                                            </span>
+                                            <p class="text-sm text-gray-500 mt-1" id="difficultyDescription">中等难度</p>
+                                        </div>
+                                        <div class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                            <span id="difficultyHint">适合有一定基础的学习者，题目涉及常见概念和应用场景</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t pt-6">
+                                        <button id="generateExamBtn" class="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-all transform hover:scale-105 shadow-lg hover:shadow-xl">
+                                            <div class="flex items-center justify-center">
+                                                <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                </svg>
+                                                生成试卷
+                                            </div>
+                                </button>
+                                        <p class="text-xs text-gray-500 text-center mt-2">点击生成您的专属模拟考试</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 考试视图 -->
+            <div id="exam-view" class="hidden">
+                <!-- 实时生成遮罩层 -->
+                <div id="realtime-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+                    <div class="flex items-start justify-center min-h-screen p-2 md:p-4 overflow-y-auto">
+                        <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl my-4 flex flex-col max-h-[calc(100vh-2rem)]">
+                            <!-- 遮罩头部 - 固定 -->
+                            <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 md:p-6 flex-shrink-0">
+                                <h3 class="text-lg md:text-xl font-bold mb-2">正在生成考试题目</h3>
+                                <div class="w-full bg-blue-300 rounded-full h-2 md:h-3 mb-2">
+                                    <div id="overlay-progress-bar" class="bg-white h-2 md:h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                                <p id="overlay-progress-text" class="text-blue-100 text-xs md:text-sm">准备中...</p>
+                            </div>
+                            
+                            <!-- 中间内容区域 - 可滚动 -->
+                            <div class="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                                <!-- 左侧题目显示 -->
+                                <div class="flex-1 p-3 md:p-6 overflow-y-auto">
+                                    <div id="realtime-questions-container" class="space-y-3 md:space-y-4">
+                                        <div class="text-center text-gray-400 py-8 waiting-placeholder">
+                                            <div class="animate-pulse">
+                                                <div class="w-12 h-12 md:w-16 md:h-16 bg-gray-200 rounded-full mx-auto mb-4"></div>
+                                                <p class="text-sm md:text-base">等待题目数据...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 右侧日志区域 -->
+                                <div class="w-full lg:w-80 bg-gray-50 border-t lg:border-t-0 lg:border-l p-3 md:p-4 flex flex-col">
+                                    <div class="flex items-center justify-between mb-3 flex-shrink-0">
+                                        <h4 class="text-xs md:text-sm font-semibold text-gray-700">生成日志</h4>
+                                        <button id="toggle-log" class="text-xs text-blue-600 hover:text-blue-800">收起</button>
+                                    </div>
+                                    <div id="generation-log" class="bg-white rounded-lg p-2 md:p-3 flex-1 overflow-y-auto text-xs font-mono border min-h-0">
+                                        <div class="text-gray-500">等待开始生成...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 遮罩底部 - 固定，始终可见 -->
+                            <div class="bg-gray-50 px-4 md:px-6 py-3 md:py-4 border-t flex-shrink-0">
+                                <div id="generation-status" class="text-center">
+                                    <p class="text-xs md:text-sm text-gray-600">
+                                        <span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                                        请耐心等待，题目正在实时生成中...
+                                    </p>
+                                </div>
+                                
+                                <!-- 生成完成确认区域 -->
+                                <div id="completion-actions" class="text-center hidden">
+                                    <p class="text-base md:text-lg font-semibold text-green-600 mb-3 md:mb-4">🎉 题目生成完成！</p>
+                                    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-3">
+                                        <button id="confirm-start-exam" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 md:py-3 px-4 md:px-6 rounded-lg w-full sm:w-auto">
+                                            确认开始答题
+                                        </button>
+                                        <div class="text-xs md:text-sm text-gray-600 text-center">
+                                            <span id="countdown-timer" class="font-bold text-blue-600 text-sm md:text-base">10</span> 秒后自动开始答题
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="loading-indicator" class="text-center hidden">
+                    <p class="text-lg font-semibold">正在生成试卷，请稍候...</p>
+                    <p id="loading-message" class="text-gray-600 mb-2"></p>
+                    <div class="w-full max-w-md mx-auto bg-gray-200 rounded-full h-4 mb-2">
+                        <div id="progress-bar" class="bg-blue-500 h-4 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p id="progress-text" class="text-sm text-gray-500 mb-4">准备中...</p>
+                    <div class="loader mt-4"></div>
+                </div>
+                <div id="exam-content" class="bg-white p-4 md:p-6 rounded-lg shadow">
+                    <h2 id="exam-title" class="text-xl md:text-2xl font-bold mb-4 text-center"></h2>
+                    <div id="questions-container">
+                        <!-- 题目将通过 JS 动态添加 -->
+                    </div>
+                    <div class="mt-6 text-center">
+                        <button id="submitExamBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg">
+                            提交答卷
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 结果视图 -->
+            <div id="result-view" class="hidden">
+                <div id="result-content" class="bg-white p-4 md:p-6 rounded-lg shadow">
+                    <h2 id="result-title" class="text-xl md:text-2xl font-bold mb-2 text-center"></h2>
+                    <p id="result-score" class="text-2xl md:text-3xl font-bold mb-4 text-center"></p>
+                    <div class="text-center mb-4">
+                         <button id="exportPdfBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
+                            导出为 PDF
+                        </button>
+                    </div>
+                    <div id="result-questions-container">
+                        <!-- 结果将通过 JS 动态添加 -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
